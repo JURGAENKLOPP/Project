@@ -1,5 +1,5 @@
-# Project
-RDD car project
+# RDD CAR Project
+
 // Define pins for the ultrasonic sensor
 const int trigPin = 9;
 const int echoPin = 8;
