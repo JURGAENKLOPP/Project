@@ -1,0 +1,165 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+// Pin definitions
+int TRIG_PIN = 2;        // Ultrasonic Sensor Trigger
+int ECHO_PIN = 3;        // Ultrasonic Sensor Echo
+int IN1 = 4;             // Motor IN1
+int IN2 = 5;             // Motor IN2
+int ENA = 6;             // Motor ENA (PWM for Motor Speed)
+int IN3 = 8;             // Motor IN3
+int IN4 = 7;             // Motor IN4
+int ENB = 9;             // Motor ENB (PWM for Motor Speed)
+int FSR_PIN = A0;        // FSR analog pin
+int LED_PIN1 = A1;       // LED 1 on A1
+int LED_PIN2 = A2;       // LED 2 on A2
+int LED_PIN3 = A3;       // LED 3 on A3
+
+// Create an LCD object (address 0x27, 16 columns and 2 rows)
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+void setup() {
+  Serial.begin(9600);
+  
+  // Initialize the LCD
+  lcd.init();
+  lcd.backlight();
+  
+  // Set pin modes
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(ENA, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+  pinMode(ENB, OUTPUT);
+  pinMode(FSR_PIN, INPUT);
+  pinMode(LED_PIN1, OUTPUT); // Set LED 1 as output
+  pinMode(LED_PIN2, OUTPUT); // Set LED 2 as output
+  pinMode(LED_PIN3, OUTPUT); // Set LED 3 as output
+
+  delay(2000);  // Wait 2 seconds before starting
+  lcd.clear();  // Clear the screen
+}
+
+void loop() {
+  // Variables to store distance and weight
+  long duration, distance;
+  int fsrValue = analogRead(FSR_PIN);
+
+  // Map the FSR reading to weight (assuming a max of 1000 grams)
+  float weight = map(fsrValue, 0, 1023, 0, 1000); // Adjust mapping if needed
+
+  // Trigger the ultrasonic sensor
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+
+  // Read the echo and calculate distance in cm
+  duration = pulseIn(ECHO_PIN, HIGH);
+  distance = (duration * 0.034) / 2;
+
+  // Print distance and weight to Serial Monitor
+  Serial.print("Distance: ");
+  Serial.print(distance);
+  Serial.print(" cm, Weight: ");
+  Serial.print(weight);
+  Serial.println(" g");
+
+  // Check weight limit condition
+  if (weight > 250) {
+    // Stop motors and display warning message on LCD if weight exceeds 250 grams
+    Serial.println("Warning: Maximum load limit exceeded!");
+
+    // Stop both motor pairs
+    digitalWrite(IN1, LOW);
+    digitalWrite(IN2, LOW);
+    analogWrite(ENA, 0); // Ensure motor 1 is stopped
+
+    digitalWrite(IN3, LOW);
+    digitalWrite(IN4, LOW);
+    analogWrite(ENB, 0); // Ensure motor 2 is stopped
+
+    // Blink LEDs
+    blinkLEDs();
+
+    // Display warning message on LCD
+    lcd.setCursor(0, 0);
+    lcd.print("!Warning Max Load!");
+    lcd.setCursor(0, 1);
+    lcd.print("Limit Exceeded! ");
+
+  } else if (distance < 20) {
+    // Stop the motors if an obstacle is detected within 20 cm
+    Serial.println("Object detected! Stopping.");
+
+    // Stop both motor pairs
+    digitalWrite(IN1, LOW);
+    digitalWrite(IN2, LOW);
+    analogWrite(ENA, 0); // Ensure motor 1 is stopped
+
+    digitalWrite(IN3, LOW);
+    digitalWrite(IN4, LOW);
+    analogWrite(ENB, 0); // Ensure motor 2 is stopped
+
+    // Blink LEDs
+    blinkLEDs();
+
+    // Display "Engine stopped" and weight on LCD
+    lcd.setCursor(0, 0);
+    lcd.print("Engine stopped   ");
+    lcd.setCursor(0, 1);
+    lcd.print("Weight: ");
+    lcd.print(weight);
+    lcd.print(" g   "); // Clear any extra characters
+
+  } else {
+    // Move forward at full speed if weight is within limit and path is clear
+    Serial.println("Path clear. Moving forward.");
+
+    // Set motors to move forward at full speed (255)
+    digitalWrite(IN1, HIGH);
+    digitalWrite(IN2, LOW);
+    analogWrite(ENA, 255); // Full speed for motor 1
+
+    digitalWrite(IN3, HIGH);
+    digitalWrite(IN4, LOW);
+    analogWrite(ENB, 255); // Full speed for motor 2
+
+    // Turn off LEDs
+    digitalWrite(LED_PIN1, LOW);
+    digitalWrite(LED_PIN2, LOW);
+    digitalWrite(LED_PIN3, LOW);
+
+    // Display distance and weight on LCD
+    lcd.setCursor(0, 0);
+    lcd.print("Dist: ");
+    lcd.print(distance);
+    lcd.print(" cm   "); // Clear any extra characters
+    
+    lcd.setCursor(0, 1);
+    lcd.print("Weight: ");
+    lcd.print(weight);
+    lcd.print(" g   "); // Clear any extra characters
+  }
+  
+  delay(100); // Short delay
+}
+
+// Function to blink LEDs every 0.5 seconds
+void blinkLEDs() {
+  // Turn LEDs on
+  digitalWrite(LED_PIN1, HIGH);
+  digitalWrite(LED_PIN2, HIGH);
+  digitalWrite(LED_PIN3, HIGH);
+  delay(500); // Wait for 0.5 seconds
+
+  // Turn LEDs off
+  digitalWrite(LED_PIN1, LOW);
+  digitalWrite(LED_PIN2, LOW);
+  digitalWrite(LED_PIN3, LOW);
+  delay(500); // Wait for 0.5 seconds
+}
