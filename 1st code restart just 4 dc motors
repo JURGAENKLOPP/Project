@@ -1,0 +1,41 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+// Pin definitions
+const int IN1 = 4;  // Motor 1 Input 1
+const int IN2 = 5;  // Motor 1 Input 2
+const int ENA = 6;  // Enable for Motor 1
+const int IN3 = 7;  // Motor 2 Input 3
+const int IN4 = 8;  // Motor 2 Input 4
+const int ENB = 9;  // Enable for Motor 2
+
+void setup() {
+    // Set pin modes
+    pinMode(IN1, OUTPUT);
+    pinMode(IN2, OUTPUT);
+    pinMode(ENA, OUTPUT);
+    pinMode(IN3, OUTPUT);
+    pinMode(IN4, OUTPUT);
+    pinMode(ENB, OUTPUT);
+
+    // Initialize motors to off
+    digitalWrite(IN1, LOW);
+    digitalWrite(IN2, LOW);
+    digitalWrite(IN3, LOW);
+    digitalWrite(IN4, LOW);
+    analogWrite(ENA, 0);
+    analogWrite(ENB, 0);
+}
+
+void loop() {
+    // Motor connected to outputs 1 and 2: Forward direction at 20/255 speed
+    digitalWrite(IN1, HIGH);
+    digitalWrite(IN2, LOW);
+    analogWrite(ENA, 20);
+
+    // Motor connected to outputs 3 and 4: Corrected forward direction at 20/255 speed
+    digitalWrite(IN3, LOW);
+    digitalWrite(IN4, HIGH);
+    analogWrite(ENB, 20);
+}
+
