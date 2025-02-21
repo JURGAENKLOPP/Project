@@ -31,11 +31,11 @@ void loop() {
     // Motor connected to outputs 1 and 2: Forward direction at 20/255 speed
     digitalWrite(IN1, HIGH);
     digitalWrite(IN2, LOW);
-    analogWrite(ENA, 20);
+    analogWrite(ENA, 10);
 
     // Motor connected to outputs 3 and 4: Corrected forward direction at 20/255 speed
     digitalWrite(IN3, LOW);
     digitalWrite(IN4, HIGH);
-    analogWrite(ENB, 20);
+    analogWrite(ENB, 10);
 }
 
