@@ -1,0 +1,69 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+// Pin definitions
+const int TRIG_PIN = 3;  // Ultrasonic Sensor Trigger
+const int ECHO_PIN = 2;  // Ultrasonic Sensor Echo
+const int IN1 = 4;  // Motor 1 Input 1
+const int IN2 = 5;  // Motor 1 Input 2
+const int ENA = 6;  // Enable for Motor 1
+const int IN3 = 7;  // Motor 2 Input 3
+const int IN4 = 8;  // Motor 2 Input 4
+const int ENB = 9;  // Enable for Motor 2
+
+void setup() {
+    Serial.begin(9600);
+    pinMode(TRIG_PIN, OUTPUT);
+    pinMode(ECHO_PIN, INPUT);
+    pinMode(IN1, OUTPUT);
+    pinMode(IN2, OUTPUT);
+    pinMode(ENA, OUTPUT);
+    pinMode(IN3, OUTPUT);
+    pinMode(IN4, OUTPUT);
+    pinMode(ENB, OUTPUT);
+    
+    // Initialize motors to off
+    digitalWrite(IN1, LOW);
+    digitalWrite(IN2, LOW);
+    digitalWrite(IN3, LOW);
+    digitalWrite(IN4, LOW);
+    analogWrite(ENA, 0);
+    analogWrite(ENB, 0);
+}
+
+long getDistance() {
+    digitalWrite(TRIG_PIN, LOW);
+    delayMicroseconds(2);
+    digitalWrite(TRIG_PIN, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(TRIG_PIN, LOW);
+    long duration = pulseIn(ECHO_PIN, HIGH, 30000);
+    return (duration * 0.034) / 2;
+}
+
+void loop() {
+    long distance = getDistance();
+    Serial.print("Distance: ");
+    Serial.print(distance);
+    Serial.println(" cm");
+
+    if (distance > 0 && distance <= 25) {
+        // Stop the motors if an obstacle is detected within 20 cm range
+        digitalWrite(IN1, LOW);
+        digitalWrite(IN2, LOW);
+        analogWrite(ENA, 0);
+        digitalWrite(IN3, LOW);
+        digitalWrite(IN4, LOW);
+        analogWrite(ENB, 0);
+    } else {
+        // Move forward at full speed if the path is clear
+        digitalWrite(IN1, HIGH);
+        digitalWrite(IN2, LOW);
+        analogWrite(ENA, 255);
+        digitalWrite(IN3, HIGH);
+        digitalWrite(IN4, LOW);
+        analogWrite(ENB, 255);
+    }
+    
+    delay(5);
+}
