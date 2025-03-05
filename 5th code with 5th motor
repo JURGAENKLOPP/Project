@@ -1,0 +1,186 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+// Pin definitions
+const int TRIG_PIN = 13;  // Ultrasonic Sensor Trigger (Reverted)
+const int ECHO_PIN = 12;  // Ultrasonic Sensor Echo (Reverted)
+const int IN1 = 4;  // Motor 1 Input 1
+const int IN2 = 5;  // Motor 1 Input 2
+const int ENA = 6;  // Enable for Motor 1
+const int IN3 = 7;  // Motor 2 Input 3
+const int IN4 = 8;  // Motor 2 Input 4
+const int ENB = 9;  // Enable for Motor 2
+const int FSR_PIN = A0; // Force Sensor Analog Pin
+const int LEDS_PIN = A1; // Red LEDs Pin
+const int WHITE_LED_PIN = A3; // White LED Pin (Stays the same)
+
+// 5th Motor Pins
+const int IN5 = 10;  // 5th Motor Input 3
+const int IN6 = 2;   // 5th Motor Input 4
+const int EN5 = 11;  // Enable for 5th Motor
+
+// Initialize LCD (I2C Address: 0x27, 16 columns, 2 rows)
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// Time tracking for 5th motor
+bool motor5Running = false;
+unsigned long motor5StartTime = 0;
+int motor5Stage = 0;  // 0 = Not Running, 1 = Forward, 2 = Pause, 3 = Reverse
+
+void setup() {
+    Serial.begin(9600);
+    lcd.init();
+    lcd.backlight();
+    
+    pinMode(TRIG_PIN, OUTPUT);
+    pinMode(ECHO_PIN, INPUT);
+    pinMode(IN1, OUTPUT);
+    pinMode(IN2, OUTPUT);
+    pinMode(ENA, OUTPUT);
+    pinMode(IN3, OUTPUT);
+    pinMode(IN4, OUTPUT);
+    pinMode(ENB, OUTPUT);
+    pinMode(FSR_PIN, INPUT);
+    pinMode(LEDS_PIN, OUTPUT);
+    pinMode(WHITE_LED_PIN, OUTPUT);
+
+    // 5th Motor setup
+    pinMode(IN5, OUTPUT);
+    pinMode(IN6, OUTPUT);
+    pinMode(EN5, OUTPUT);
+
+    // Initialize all motors to off
+    digitalWrite(IN1, LOW);
+    digitalWrite(IN2, LOW);
+    digitalWrite(IN3, LOW);
+    digitalWrite(IN4, LOW);
+    analogWrite(ENA, 0);
+    analogWrite(ENB, 0);
+    
+    digitalWrite(IN5, LOW);
+    digitalWrite(IN6, LOW);
+    analogWrite(EN5, 0);
+}
+
+long getDistance() {
+    digitalWrite(TRIG_PIN, LOW);
+    delayMicroseconds(2);
+    digitalWrite(TRIG_PIN, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(TRIG_PIN, LOW);
+    long duration = pulseIn(ECHO_PIN, HIGH, 30000);
+    return (duration * 0.034) / 2;
+}
+
+void loop() {
+    static long lastDistance = -1;
+    static float lastWeight = -1;
+    
+    long distance = getDistance();
+    int fsrValue = analogRead(FSR_PIN);
+    float weight = map(fsrValue, 0, 1023, 0, 1000); // Convert to grams
+    
+    if (distance != lastDistance || weight != lastWeight) {
+        Serial.print("Distance: ");
+        Serial.print(distance);
+        Serial.print(" cm, Weight: ");
+        Serial.print(weight);
+        Serial.println(" g");
+
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Dist: ");
+        lcd.print(distance);
+        lcd.print(" cm");
+        
+        lcd.setCursor(0, 1);
+        lcd.print("Weight: ");
+        lcd.print(weight);
+        lcd.print(" g");
+
+        lastDistance = distance;
+        lastWeight = weight;
+    }
+
+    // Motor stopping condition (0 to 20 cm)
+    if ((distance >= 0 && distance <= 20) || weight > 300) {
+        digitalWrite(IN1, LOW);
+        digitalWrite(IN2, LOW);
+        analogWrite(ENA, 0);
+        digitalWrite(IN3, LOW);
+        digitalWrite(IN4, LOW);
+        analogWrite(ENB, 0);
+        Serial.println("Motors Stopped");
+
+        // Blink red LEDs and white LEDs when motors stop
+        digitalWrite(LEDS_PIN, millis() % 600 < 300); // Red LEDs blink every 0.3 sec
+        digitalWrite(WHITE_LED_PIN, millis() % 600 < 300); // White LEDs blink every 0.3 sec
+    } else {
+        // Move forward at full speed if the path is clear
+        digitalWrite(IN1, HIGH);
+        digitalWrite(IN2, LOW);
+        analogWrite(ENA, 255);
+        digitalWrite(IN3, HIGH);
+        digitalWrite(IN4, LOW);
+        analogWrite(ENB, 255);
+        
+        // Turn off LEDs when moving
+        digitalWrite(LEDS_PIN, LOW);
+        digitalWrite(WHITE_LED_PIN, LOW);
+    }
+
+    // **5th Motor Control**
+    if (weight > 300) {
+        if (!motor5Running) {
+            motor5Running = true;
+            motor5Stage = 1;
+            motor5StartTime = millis();
+        }
+    }
+
+    if (motor5Running) {
+        unsigned long elapsedTime = millis() - motor5StartTime;
+
+        switch (motor5Stage) {
+            case 1:
+                if (elapsedTime < 3000) {
+                    // Move forward for 3 seconds
+                    digitalWrite(IN5, HIGH);
+                    digitalWrite(IN6, LOW);
+                    analogWrite(EN5, 255);
+                  motor5Stage = 1;
+                } else {
+                    // Transition to pause
+                    digitalWrite(IN5, LOW);
+                    digitalWrite(IN6, LOW);
+                    analogWrite(EN5, 0);
+                    motor5Stage = 2;
+                    motor5StartTime = millis();
+                }
+                break;
+            
+            case 2:
+                if (elapsedTime >= 3000) {
+                    // Transition to move backward
+                    motor5Stage = 3;
+                    motor5StartTime = millis();
+                }
+                break;
+            
+            case 3:
+                if (elapsedTime < 3000) {
+                    // Move backward for 3 seconds
+                    digitalWrite(IN5, LOW);
+                    digitalWrite(IN6, HIGH);
+                    analogWrite(EN5, 255);
+                } else {
+                    // Stop the motor
+                    digitalWrite(IN5, LOW);
+                    digitalWrite(IN6, LOW);
+                    analogWrite(EN5, 0);
+                    motor5Running = false;
+                }
+                break;
+        }
+    }
+}
